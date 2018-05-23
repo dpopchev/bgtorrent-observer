@@ -55,11 +55,12 @@ parser.add_argument(
     help="url of the tracker"
 )
 
-def torrent_search( user, passwd, url, tname ):
+
+def torrent_search(user, passwd, url, tname):
     """
     search for <tname> torrent in <url> as <user> with password <passwd> and
-    return the latest uploaded torrent name and id (found in as the second row in the
-    second table)
+    return the latest uploaded torrent name and id (found in as the second
+    row in the second table)
 
     Parameteres
     -----------
@@ -77,7 +78,7 @@ def torrent_search( user, passwd, url, tname ):
 
     Returns
     -------
-    : list
+    : tuple
         [0]: string
             the torrent name found, if nothing found it will be empty string
 
@@ -108,7 +109,7 @@ def torrent_search( user, passwd, url, tname ):
             print("\n DID NOT CONNECT TO SITE \n")
             exit()
         else:
-            print("\n connection established \n")
+            print("\n connection established, torrent search \n")
 
         #~ make a search for the latest uploaded torrent
         p = s.get(
@@ -138,20 +139,108 @@ def torrent_search( user, passwd, url, tname ):
 
         if torrent_name and torrent_id:
             print(
-                "\n\t Found\t {} \t with id \t {} \n".format(torrent_name, torrent_id)
+                "\n\t Found \t {} \t with id \t {} \n".format(
+                    torrent_name, torrent_id)
             )
         else:
             print(
                 "\n\t Nothing found for \t {} \n".format(tname)
             )
 
+        return torrent_name, torrent_id
+
+
+def torrent_download(user, passwd, url, tname, tid):
+    """
+    download the torrent with <tname> and id <tid> from tracker <url>
+    as user <user> with password <passwd>
+
+    Parameters
+    ----------
+    user: string
+        the user
+
+    passwd: string
+        the password
+
+    url: string
+        the tracker url
+
+    tname: string
+        torrent name
+
+    tid: string
+        torrent id
+
+    Returns
+    -------
+    : string
+      Return the full path to the torrent
+    """
+    import requests
+
+    with requests.Session() as s:
+
+        #~ login with credentials
+        p = s.post(
+            url,
+            params={
+                "page": "login"
+            },
+            data={
+                "uid": user,
+                "pwd": passwd
+            }
+        )
+
+        if p.status_code != requests.codes.ok:
+            print("\n DID NOT CONNECT TO SITE \n")
+            exit()
+        else:
+            print("\n connection established, torrent download \n")
+
+        p = s.get(
+            url + "download.php",
+            params={
+                "id": tid,
+                "f": tname + ".torrent"
+            }
+        )
+
+        with open("/tmp/{}.torrent".format(tname), "wb") as f:
+            f.write(p.content)
+
+        print("\n\t Find file at /tmp/{}.torrent \n".format(tname))
+
+        return "/tmp/{}.torrent".format(tname)
+
+
+def torrent_start(fpath):
+
+    import transmissionrpc
+    import os
+
+    tc = transmissionrpc.Client("localhost", port=9091, timeout=1)
+
+    tc.add_torrent(fpath)
+
+    try:
+        os.remove(fpath)
+    except OSError:
+        pass
+
+
 if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    torrent_search(args.uname[0], args.passwd[0], args.url[0], args.tname[0])
+    tname, tid = torrent_search(
+        args.uname[0], args.passwd[0], args.url[0], args.tname[0]
+    )
 
+    if tname and tid:
+        fpath = torrent_download(
+            args.uname[0], args.passwd[0], args.url[0], tname, tid
+        )
 
-
-
-
+        torrent_start(fpath)
