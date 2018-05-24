@@ -70,7 +70,44 @@ parser.add_argument(
     )
 )
 
-def _get_ep_full_list(user_ssh, paramiko_connect, rpath):
+def get_ep_full_list(user_ssh, paramiko_connect, rpath):
+    """
+    get the full list of the episodes contained in an remote directory using
+    paramiko module; depending or n the contented in <usr_ssh> it will connect
+    either by username/password or attempting to use known private key
+
+    Parameters
+    ----------
+    user_ssh: string
+        if string is not empty, should point to users .ssh and will attempt to
+        automatically connect by using pre done private/pub key to the remote
+        server
+
+        if string is empty, then username/password method is used
+
+    paramiko_connect: dic
+        if <user_ssh> string is empty, the string should look like this:
+            {
+                "hostname": <hostname>,
+                "username": <username",
+                "password": <password>
+            }
+
+        if <user_ssh> points to valid .ssh with known_hosts file should like this
+            {
+                "hostname": <hostname>,
+                "username": <username>,
+                "look_for_keys: True
+
+    rpath: string
+        the remote path containing all episodes to retrive
+
+    Returns
+    -------
+    : list
+        list of file names containing on remote server
+    """
+
 
     import paramiko
 
@@ -89,7 +126,26 @@ def _get_ep_full_list(user_ssh, paramiko_connect, rpath):
 
         return stdout.readlines()
 
-def _get_ep_latest(ep_list):
+def get_ep_latest(ep_list):
+    """
+    for provided <ep_list>, it will find the latest episode, which means the one
+    with the biggest number; it works by searching something like S01E12, and
+    will return Name_of_episode_S01E12 and its number E12
+
+    Parameters
+    ----------
+    ep_list: list
+        list of all episodes of single season
+
+    Returns
+    -------
+    : tuple
+        : string
+            the name of the latest episode
+
+        : string
+            the episode number in the form E10
+    """
 
     import re
 
@@ -111,11 +167,26 @@ def _get_ep_latest(ep_list):
 
     return ep_list[latest_ep_i], ep_num
 
-def _get_ep_next(ep_latest, ep_num):
+def get_ep_next(ep_latest, ep_num):
+    """
+    for provided episode name and number return which should be the next episode
 
+    Parameters
+    ----------
+    ep_latest: string
+        the full name of the episode
+
+    ep_num: the current episode number
+
+    Returns
+    -------
+    : string
+        the name of the next episode, just incremeted number after E
+
+    """
     _ = ep_latest.split(ep_num)
 
-    ep_num = "{}{}".format(ep_num[0], int(ep_num[1:])+1)
+    ep_num = "{}{:02d}".format(ep_num[0], int(ep_num[1:])+1)
 
     return "".join(_[:1] + [ep_num] + _[1:]), ep_num
 
@@ -136,7 +207,7 @@ if __name__ == "__main__":
         paramiko_connect = {
             "hostname": args.rhost[0],
             "username": "root",
-            "allow_agent": True
+            "look_for_keys": True
         }
 
     elif args.passwd:
@@ -149,6 +220,6 @@ if __name__ == "__main__":
         print("\n One of '-k' or '-p' required \n")
         exit()
 
-    ep_list = _get_ep_full_list(user_ssh, paramiko_connect, args.rhost_path[0])
-    ep_latest, ep_num = _get_ep_latest(ep_list)
-    ep_next_name, ep_next_num = _get_ep_next(ep_latest, ep_num)
+    ep_list = get_ep_full_list(user_ssh, paramiko_connect, args.rhost_path[0])
+    ep_latest, ep_num = get_ep_latest(ep_list)
+    ep_next_name, ep_next_num = get_ep_next(ep_latest, ep_num)
