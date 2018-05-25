@@ -38,6 +38,19 @@ parser.add_argument(
     help="the path on remote host, where to lookup of the latest downloaded file"
 )
 
+#~ path to where to look up
+parser.add_argument(
+    "-rpath_s", "--rpath_season",
+    action="store",
+    nargs=1,
+    type=int,
+    required=False,
+    metavar="",
+    dest="rhost_path_season",
+    help="the current season, if not present presumes no seasons and will not"
+    "search for folder with name of type Season_02 in rhost_path"
+)
+
 #~ boolean variable wheter to use user local .ssh folder
 parser.add_argument(
     "-us", "--user_ssh",
@@ -192,6 +205,8 @@ def get_ep_next(ep_latest, ep_num):
 
 if __name__ == "__main__":
 
+    import os
+
     args = parser.parse_args()
 
     user_ssh = ""
@@ -200,7 +215,6 @@ if __name__ == "__main__":
         print("\n Cannot use both '-sp' and '-p' \n")
         exit()
     elif args.user_ssh:
-        import os
 
         user_ssh = os.path.expanduser(os.path.join("~", ".ssh", "known_hosts"))
 
@@ -220,6 +234,14 @@ if __name__ == "__main__":
         print("\n One of '-k' or '-p' required \n")
         exit()
 
-    ep_list = get_ep_full_list(user_ssh, paramiko_connect, args.rhost_path[0])
+    if args.rhost_path_season:
+        rhost_path = os.path.join(
+            args.rhost_path[0],
+            "Season_{:02d}".format(args.rhost_path_season[0])
+        )
+    else:
+        rhost_path = args.rhost_path[0]
+
+    ep_list = get_ep_full_list(user_ssh, paramiko_connect, rhost_path)
     ep_latest, ep_num = get_ep_latest(ep_list)
     ep_next_name, ep_next_num = get_ep_next(ep_latest, ep_num)
