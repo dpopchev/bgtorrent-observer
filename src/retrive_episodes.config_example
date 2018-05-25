@@ -1,0 +1,14 @@
+[DEFAULT]
+remote_host = remote_host
+remote_user = remote_username
+remote_passwd = remote_passwd
+remote_ssh_user = remote_user_ssh
+
+tracker_url = tracker_url
+tracker_user = tracker_user
+tracker_passwd = tracker_passwd
+
+[some_series]
+name = "series_name_to_search_in_tracker"
+remote_path = "/media/USB-2015033100066-1/Series/Sofia_Den_Nosht/"
+alias = "series_alieas_to_use_for_search_in_tracker"
