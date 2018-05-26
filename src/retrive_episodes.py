@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "-sc", "--series_config",
     action="store",
-    nargs="+",
+    nargs=1,
     type=str,
     required=True,
     metavar="",
@@ -97,13 +97,21 @@ if __name__ == "__main__":
 
         if config.get(section, "season"):
             tname_search = "{} S{:02d} {}".format(
-                config.get(section, "name"),
+                (
+                    config.get(section,"alias")
+                    if config.get(section,"alias")
+                    else config.get(section, "name")
+                ),
                 config.getint(section, "season"),
                 ep_next_num
             )
         else:
             tname_search = "{} {}".format(
-                config.get(section, "name"),
+                (
+                    config.get(section,"alias")
+                    if config.get(section,"alias")
+                    else config.get(section, "name")
+                ),
                 ep_next_num
             )
 

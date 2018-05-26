@@ -137,6 +137,13 @@ def get_ep_full_list(user_ssh, paramiko_connect, rpath):
             "find {} -type f -exec basename {{}} \;".format(rpath)
         )
 
+        if stderr and "No such file or directory" in stderr.readline():
+
+            print("\n\t Season directory missing, creating... \n")
+            stdin, stdout, stderr = ssh.exec_command(
+                "mkdir -p {}".format(rpath)
+            )
+
         return stdout.readlines()
 
 def get_ep_latest(ep_list):
@@ -167,18 +174,21 @@ def get_ep_latest(ep_list):
     latest_ep_num = 0
     latest_ep_i = 0
 
-    for i, val in enumerate(ep_list):
+    if ep_list:
+        for i, val in enumerate(ep_list):
 
-        m = rexp.search(val)
+            m = rexp.search(val)
 
-        _, *__ = m.groups()
+            _, *__ = m.groups()
 
-        if latest_ep_num < int(_[1:]):
-            latest_ep_num = int(_[1:])
-            ep_num = _
-            latest_ep_i = i
+            if latest_ep_num < int(_[1:]):
+                latest_ep_num = int(_[1:])
+                ep_num = _
+                latest_ep_i = i
 
-    return ep_list[latest_ep_i], ep_num
+        return ep_list[latest_ep_i], ep_num
+    else:
+        return "", "E01"
 
 def get_ep_next(ep_latest, ep_num):
     """
@@ -197,11 +207,15 @@ def get_ep_next(ep_latest, ep_num):
         the name of the next episode, just incremeted number after E
 
     """
-    _ = ep_latest.split(ep_num)
 
-    ep_num = "{}{:02d}".format(ep_num[0], int(ep_num[1:])+1)
+    if ep_latest:
+        _ = ep_latest.split(ep_num)
 
-    return "".join(_[:1] + [ep_num] + _[1:]), ep_num
+        ep_num = "{}{:02d}".format(ep_num[0], int(ep_num[1:])+1)
+
+        return "".join(_[:1] + [ep_num] + _[1:]), ep_num
+    else:
+        return "", "E01"
 
 if __name__ == "__main__":
 
