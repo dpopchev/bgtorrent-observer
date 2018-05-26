@@ -96,9 +96,12 @@ if __name__ == "__main__":
                     exit()
 
                 if stdout.readline():
-                    print("\n\t already downloaded, will remove... \n")
+                    if config.getboolean("DEFAULT", "local_delete"):
+                        print("\n\t already downloaded, DELETE is YES... \n")
 
-                    tc.remove_torrent(_, delete_data=True)
+                        tc.remove_torrent(_, delete_data=True)
+                    else:
+                        print("\n\t already downloaded, DELETE is NO... \n")
                 else:
 
                     stdin, stdout, stderr = ssh.exec_command(
