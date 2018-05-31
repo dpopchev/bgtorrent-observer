@@ -22,6 +22,9 @@ fh.setFormatter(
     logging.Formatter("%(asctime)s - %(levelname)s - %(filename)s/%(module)s - %(message)s")
 )
 
+if (logger.hasHandlers()):
+    logger.handlers.clear()
+
 logger.addHandler(fh)
 
 parser = argparse.ArgumentParser(
@@ -53,7 +56,9 @@ if __name__ == "__main__":
     elif len(args.series_list) == 1:
         config.read(args.series_list[0])
     else:
-        logger.error("Cannot load the series config file, terminating...")
+        logger.error(
+            "Cannot load the series config file {}, terminating...".format(args.series_list)
+        )
         exit()
 
     user_ssh = ""

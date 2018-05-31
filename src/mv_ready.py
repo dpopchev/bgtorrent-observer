@@ -37,7 +37,7 @@ parser.add_argument(
     type=str,
     required=False,
     metavar="",
-    default="retrive_episodes.config",
+    default="retrive_episodes.config".encode("utf-8"),
     dest="series_list",
     help="config file to know which folders we keep an eye on"
 )
@@ -221,7 +221,8 @@ if __name__ == "__main__":
                         )
 
                         p = subprocess.Popen( [
-                            "scp -q",
+                            "scp",
+                            "-q",
                             lpath_cp,
                             "{}:{}".format(
                                 config.get("DEFAULT", "remote_host"),

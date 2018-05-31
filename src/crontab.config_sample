@@ -1,0 +1,9 @@
+SHELL=/bin/bash
+PYTHONIOENCODING=UTF-8
+TERM=qterminal
+LANG=en_GB.UTF-8
+LC_ALL=en_GB.UTF-8
+
+*/5 * * * * DISPLAY=:0.0 feh --randomize --bg-scale ~/Documents/Wallpapers/*
+0 * * * * cd ~/projects/Torrent_dw_mv/src/ && echo "$(date) Starting retrive_episodes" > cron.log && ./retrive_episodes.py >> cron.log 2>&1
+30 * * * * cd ~/projects/Torrent_dw_mv/src/ && echo "$(date) Starting mv_ready" > cron.log && ./mv_ready.py >> cron.log 2>&1
