@@ -1,6 +1,23 @@
 #!/usr/bin/env python
 
 import argparse
+import logging
+import logging.handlers
+
+logger = logging.getLogger("myLogger")
+logger.setLevel(logging.INFO)
+
+fh = logging.handlers.TimedRotatingFileHandler(
+    filename="Torrent_dw_mv.log",
+    when="W1",
+    backupCount=2
+)
+fh.setLevel(logging.INFO)
+fh.setFormatter(
+    logging.Formatter("%(asctime)s - %(levelname)s - %(filename)s/%(module)s - %(message)s")
+)
+
+logger.addHandler(fh)
 
 _ssh_pswdless = "http://www.linuxproblem.org/art_9.html"
 _ssh_paramiko = "https://www.minvolai.com/how-to-ssh-in-python-using-paramiko/"
@@ -121,7 +138,6 @@ def get_ep_full_list(user_ssh, paramiko_connect, rpath):
         list of file names containing on remote server
     """
 
-
     import paramiko
 
     with paramiko.SSHClient() as ssh:
@@ -139,7 +155,7 @@ def get_ep_full_list(user_ssh, paramiko_connect, rpath):
 
         if stderr and "No such file or directory" in stderr.readline():
 
-            print("\n\t Season directory missing, creating... \n")
+            logger.info("Season directory missing, creating...")
             stdin, stdout, stderr = ssh.exec_command(
                 "mkdir -p {}".format(rpath)
             )
@@ -226,7 +242,7 @@ if __name__ == "__main__":
     user_ssh = ""
 
     if args.user_ssh and args.passwd:
-        print("\n Cannot use both '-sp' and '-p' \n")
+        logger.info("Cannot use both '-sp' and '-p'")
         exit()
     elif args.user_ssh:
 
@@ -245,7 +261,7 @@ if __name__ == "__main__":
             "password": args.passwd[0]
         }
     else:
-        print("\n One of '-k' or '-p' required \n")
+        logger.error("One of '-k' or '-p' required")
         exit()
 
     if args.rhost_path_season:

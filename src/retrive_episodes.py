@@ -3,10 +3,26 @@
 import argparse
 import configparser
 import os
-
 #~ my local modules
 import files_lookup
 import torrent_download
+import logging
+import logging.handlers
+
+logger = logging.getLogger("myLogger")
+logger.setLevel(logging.INFO)
+
+fh = logging.handlers.TimedRotatingFileHandler(
+    filename="Torrent_dw_mv.log",
+    when="W1",
+    backupCount=2
+)
+fh.setLevel(logging.INFO)
+fh.setFormatter(
+    logging.Formatter("%(asctime)s - %(levelname)s - %(filename)s/%(module)s - %(message)s")
+)
+
+logger.addHandler(fh)
 
 parser = argparse.ArgumentParser(
     description="Retrieve which should be the next episode number"
@@ -19,8 +35,9 @@ parser.add_argument(
     action="store",
     nargs=1,
     type=str,
-    required=True,
+    required=False,
     metavar="",
+    default="retrive_episodes.config",
     dest="series_list",
     help="config from where to load info about series names, aliases and etc"
 )
@@ -31,14 +48,21 @@ if __name__ == "__main__":
 
     config = configparser.ConfigParser()
 
-    config.read(args.series_list[0])
+    if type(args.series_list) is str:
+        config.read(args.series_list)
+    elif len(args.series_list) == 1:
+        config.read(args.series_list[0])
+    else:
+        logger.error("Cannot load the series config file, terminating...")
+        exit()
 
     user_ssh = ""
 
     if config.getboolean("DEFAULT", "remote_ssh_user"):
-        import os
 
         user_ssh = os.path.expanduser(os.path.join("~", ".ssh", "known_hosts"))
+
+        logger.info("Will look for keys for known hosts here {}".format(user_ssh))
 
         paramiko_connect = {
             "hostname": config.get("DEFAULT", "remote_host"),
@@ -46,6 +70,9 @@ if __name__ == "__main__":
             "look_for_keys": True
         }
     else:
+
+        logger.info("Will use username and password")
+
         paramiko_connect = {
             "hostname": config.get("DEFAULT", "remote_host"),
             "username": config.get("DEFAULT", "remote_user"),
@@ -57,8 +84,9 @@ if __name__ == "__main__":
         rhost_path = ""
 
         if config.get(section, "season"):
-            print(
-                "\n Checking for... {} S{:02d}".format(
+
+            logger.info(
+                "Checking for... {} S{:02d}".format(
                 config.get(section, "name"),
                 config.getint(section, "season")
             ) )
@@ -69,8 +97,8 @@ if __name__ == "__main__":
             )
 
         else:
-            print(
-                "\n Checking for... {}".format(
+            logger.info(
+                "Checking for... {}".format(
                 config.get(section, "name"),
             ) )
 
@@ -86,9 +114,8 @@ if __name__ == "__main__":
 
         ep_next_name, ep_next_num = files_lookup.get_ep_next(ep_latest, ep_num)
 
-        print(
-            "\n\t next should be... {}"
-            "\n\t searching in tracker... \n".format(
+        logger.info(
+            "searching next in tracker with number {}".format(
                 ep_next_num
             )
         )
@@ -124,10 +151,8 @@ if __name__ == "__main__":
 
         if tname and tid:
 
-            print(
-                "\n\t torrent found... "
-                "\n\t\t name: {}"
-                "\n\t\t id: {}".format(tname, tid)
+            logger.info(
+                "torrent found with name {} and id {}".format(tname, tid)
             )
 
             fpath = torrent_download.torrent_download(
@@ -141,6 +166,6 @@ if __name__ == "__main__":
             torrent_download.torrent_start(fpath)
         else:
 
-            print(
-                "\n\t torrent NOT found... "
+            logger.info(
+                "torrent {} NOT found... ".format(tname)
             )

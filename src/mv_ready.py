@@ -6,6 +6,23 @@ import argparse
 import configparser
 import os
 import subprocess
+import logging
+import logging.handlers
+
+logger = logging.getLogger("myLogger")
+logger.setLevel(logging.INFO)
+
+fh = logging.handlers.TimedRotatingFileHandler(
+    filename="Torrent_dw_mv.log",
+    when="W1",
+    backupCount=2
+)
+fh.setLevel(logging.INFO)
+fh.setFormatter(
+    logging.Formatter("%(asctime)s - %(levelname)s - %(filename)s/%(module)s - %(message)s")
+)
+
+logger.addHandler(fh)
 
 parser = argparse.ArgumentParser(
     description="Check for finished downloads, if any and they are not moved,"
@@ -18,8 +35,9 @@ parser.add_argument(
     action="store",
     nargs=1,
     type=str,
-    required=True,
+    required=False,
     metavar="",
+    default="retrive_episodes.config",
     dest="series_list",
     help="config file to know which folders we keep an eye on"
 )
@@ -30,7 +48,17 @@ if __name__ == "__main__":
 
     config = configparser.ConfigParser()
 
-    config.read(args.series_list[0])
+    if type(args.series_list) is str:
+        config.read(args.series_list)
+        logger.debug("Using default config file {}".format(args.series_list))
+
+    elif len(args.series_list) == 1:
+        config.read(args.series_list[0])
+        logger.debug("Using config file {}".format(args.series_list[0]))
+
+    else:
+        logger.error("Cannot load the series config file, terminating...")
+        exit()
 
     user_ssh = ""
 
@@ -38,12 +66,17 @@ if __name__ == "__main__":
 
         user_ssh = os.path.expanduser(os.path.join("~", ".ssh", "known_hosts"))
 
+        logger.info("Will look for keys for known hosts here {}".format(user_ssh))
+
         paramiko_connect = {
             "hostname": config.get("DEFAULT", "remote_host"),
             "username": config.get("DEFAULT", "remote_user"),
             "look_for_keys": True
         }
     else:
+
+        logger.info("Will use username and password")
+
         paramiko_connect = {
             "hostname": config.get("DEFAULT", "remote_host"),
             "username": config.get("DEFAULT", "remote_user"),
@@ -63,12 +96,17 @@ if __name__ == "__main__":
         t = tc.get_files()[_]
 
         if len(t.keys()) > 1:
+            logger.warning(
+                "Torrent {} has more than 1 file, unlikely to be series".format(
+                    len(t.keys())
+                )
+            )
             continue
         else:
             t = t[0]
 
         if t["completed"] == t["size"]:
-            print("\n Completed is... {} \n".format(t["name"]))
+            logger.info("Torrent {} is completed".format(t["name"]))
 
             with paramiko.SSHClient() as ssh:
 
@@ -87,22 +125,38 @@ if __name__ == "__main__":
 
                 ssh_stderr = stderr.readlines()
 
+                #~ read the first line only, as it is the one containing path
+                ssh_stdout = stdout.readline()
+
                 if ssh_stderr:
-                    print("\n find ended with errors:")
 
-                    for _ in ssh_stderr:
-                        print("\t {}".format(_))
+                    logger.error("SSH find ended with errors, line by line they are:")
 
-                    exit()
+                    for _, __ in enumerate(ssh_stderr):
+                        logger.error("{}. {}".format(_, __))
 
-                if stdout.readline():
+                    logger.error(
+                        "skipping rest of actions for torrent {}".format(
+                            _
+                        )
+                    )
+
+                    continue
+
+                if ssh_stdout:
+
+                    logger.info("SSH find got this file {}".format(ssh_stdout))
+
                     if config.getboolean("DEFAULT", "local_delete"):
-                        print("\n\t already downloaded, DELETE is YES... \n")
+
+                        logger.info("Remove local files is YES, removing...")
 
                         tc.remove_torrent(_, delete_data=True)
                     else:
-                        print("\n\t already downloaded, DELETE is NO... \n")
+                        logger.info("Remove local files is NO, preserving...")
                 else:
+
+                    logger.info("SSH find did not found any file")
 
                     stdin, stdout, stderr = ssh.exec_command(
                         "find {} -type f -name {}* | head -n1".format(
@@ -112,17 +166,43 @@ if __name__ == "__main__":
                     )
 
                     ssh_stderr = stderr.readlines()
+                    #~ read the first line only, as it is the one containing path
+                    #~ it will get only the directory path
+                    rpath_cp = os.path.dirname(stdout.readline())
 
+                    #~ if it has any errors
                     if ssh_stderr:
-                        print("\n dirname ended with error, \n\t {} \n".format(ssh_stderr))
-                        exit()
-                    else:
-                        rpath_cp = os.path.dirname(stdout.readline())
+                        logger.error("SSH find ended with errors, line by line they are:")
 
-                        if os.path.commonprefix([*list_dirs, rpath_cp ]):
-                            print("\n\t will copy it to... {}".format(rpath_cp))
+                        for _, __ in enumerate(ssh_stderr):
+                            logger.error("\t {}. {}".format(_, __))
+
+                        logger.error("skipping rest of actions for this torrent")
+
+                        continue
+
+                    #~ if there is an remote path, not something like empty string
+                    elif rpath_cp:
+
+                        #~ get the common prefix of the list dirs in the config
+                        #~ and remote path, if there is any, the torrent should
+                        #~ go to series, if not - no
+                        _commonprefix = os.path.commonprefix([*list_dirs, rpath_cp ])
+
+                        if _commonprefix:
+
+                            logger.info(
+                                "Torrent {} can go to {}".format(
+                                    _, rpath_cp
+                                )
+                            )
+
                         else:
-                            print("\n\t not part of Series... {}".format(rpath_cp))
+                            logger.warning(
+                                "Torrent {} not part of series, skip next actions".format(
+                                    _
+                                )
+                            )
                             continue
 
                         lpath_cp = os.path.expanduser(
@@ -133,8 +213,15 @@ if __name__ == "__main__":
                             )
                         )
 
+                        logger.info(
+                            "Torrent {} will copy local file at {} to {}"
+                            "using scp right now".format(
+                                _, lpath_cp, rpath_cp
+                            )
+                        )
+
                         p = subprocess.Popen( [
-                            "scp",
+                            "scp -q",
                             lpath_cp,
                             "{}:{}".format(
                                 config.get("DEFAULT", "remote_host"),
@@ -144,5 +231,8 @@ if __name__ == "__main__":
 
                         sts = os.waitpid(p.pid, 0)
         else:
-            print("\n NOT completed is... {} \n".format(t["name"]))
-
+            logger.info(
+                "Torrent {} with name {} is not completed".format(
+                    _, t["name"]
+                )
+            )

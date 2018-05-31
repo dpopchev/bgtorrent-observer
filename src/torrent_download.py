@@ -1,6 +1,23 @@
 #!/usr/bin/env python
 
 import argparse
+import logging
+import logging.handlers
+
+logger = logging.getLogger("myLogger")
+logger.setLevel(logging.INFO)
+
+fh = logging.handlers.TimedRotatingFileHandler(
+    filename="Torrent_dw_mv.log",
+    when="W1",
+    backupCount=2
+)
+fh.setLevel(logging.INFO)
+fh.setFormatter(
+    logging.Formatter("%(asctime)s - %(levelname)s - %(filename)s/%(module)s - %(message)s")
+)
+
+logger.addHandler(fh)
 
 parser = argparse.ArgumentParser(
     description="Create connection to http://alien.org/ with provided credentials"
@@ -106,10 +123,10 @@ def torrent_search(user, passwd, url, tname):
         )
 
         if p.status_code != requests.codes.ok:
-            print("\n DID NOT CONNECT TO SITE \n")
+            logger.error("DID NOT CONNECT TO SITE")
             exit()
         else:
-            print("\n connection established, torrent search \n")
+            logger.info("connection established, torrent search")
 
         #~ make a search for the latest uploaded torrent
         p = s.get(
@@ -138,13 +155,13 @@ def torrent_search(user, passwd, url, tname):
             torrent_id = ""
 
         if torrent_name and torrent_id:
-            print(
-                "\n\t Found \t {} \t with id \t {} \n".format(
+            logger.info(
+                "Found {} with id {}".format(
                     torrent_name, torrent_id)
             )
         else:
-            print(
-                "\n\t Nothing found for \t {} \n".format(tname)
+            logger.info(
+                "Nothing found for {}".format(tname)
             )
 
         return torrent_name, torrent_id
@@ -194,10 +211,10 @@ def torrent_download(user, passwd, url, tname, tid):
         )
 
         if p.status_code != requests.codes.ok:
-            print("\n DID NOT CONNECT TO SITE \n")
+            logger.error("DID NOT CONNECT TO SITE")
             exit()
         else:
-            print("\n connection established, torrent download \n")
+            logger.info("connection established, torrent download")
 
         p = s.get(
             url + "download.php",
@@ -210,7 +227,7 @@ def torrent_download(user, passwd, url, tname, tid):
         with open("/tmp/{}.torrent".format(tname), "wb") as f:
             f.write(p.content)
 
-        print("\n\t Find file at /tmp/{}.torrent \n".format(tname))
+        logger.info("Find file at /tmp/{}.torrent".format(tname))
 
         return "/tmp/{}.torrent".format(tname)
 
