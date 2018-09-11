@@ -1,1 +1,1 @@
-# Automate the process of download and move episodes
+# Automate the process of downloading new series and moving them to my storage for viewing pleasure

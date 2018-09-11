@@ -37,7 +37,7 @@ parser.add_argument(
     type=str,
     required=False,
     metavar="",
-    default="retrive_episodes.config".encode("utf-8"),
+    default="retrive_episodes.config",
     dest="series_list",
     help="config file to know which folders we keep an eye on"
 )
