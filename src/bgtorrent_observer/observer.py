@@ -1,7 +1,14 @@
 from __future__ import annotations
 
+import enum
+import tomllib
 from dataclasses import dataclass, replace
-from typing import NamedTuple, Optional
+from typing import Any, NamedTuple, Optional
+
+
+class Tracker(enum.StrEnum):
+    P2PBG = "p2pbg"
+    ARENABG = "arenabg"
 
 
 class RequestArguments(NamedTuple):
@@ -19,3 +26,14 @@ class RequestCredentials:
 
     def update(self, **changes) -> RequestCredentials:
         return replace(self, **changes)
+
+
+def parse_config(config: str) -> dict[str, Any]:
+    """process the configuration into dictionary"""
+    return tomllib.loads(config)
+
+
+def make_tracker_credentials(tracker: Tracker, config: dict[str, Any]) -> RequestCredentials:
+    """make tracker credentials using configuration representation"""
+    return RequestCredentials(*(config[tracker.value]['credentials'][e]
+                                for e in ('user', 'password')))
