@@ -1,3 +1,9 @@
-retrive_episodes.config
+.ipynb_checkpoints
+.stamps
+.venv
 Torrent_dw_mv.log*
+__pycache__
+bgtorrent_observer.egg-info
 cron.log
+notebook_pairs/ipynbs/
+retrive_episodes.config

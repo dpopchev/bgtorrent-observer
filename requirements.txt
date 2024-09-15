@@ -1,0 +1,12 @@
+add-trailing-comma
+autopep8
+isort
+mypy
+pylint
+pylint-junit
+pynvim
+pytest
+pytest-cov
+pytest-datadir
+pytest-datafiles
+pytest-mock
