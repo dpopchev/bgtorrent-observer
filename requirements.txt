@@ -10,3 +10,5 @@ pytest-cov
 pytest-datadir
 pytest-datafiles
 pytest-mock
+types-beautifulsoup4
+types-requests

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, cast
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
+import bs4
 import requests
-from bs4 import BeautifulSoup
 
 from bgtorrent_observer.observer import RequestArguments, RequestCredentials
 
@@ -135,14 +135,17 @@ def download_torrent(s: Session,
         session=requests.utils.dict_from_cookiejar(s.cookies)['PHPSESSID'])
     search_args = make_search_args(episode, credentials)
     r = s.get(search_args.url, **search_args.kwargs)
-    soup = BeautifulSoup(r.content.decode('utf-8', 'ignore'), 'html.parser')
-    tag = soup.find(torrent_tag_filter)
+    soup = bs4.BeautifulSoup(r.content.decode(
+        'utf-8', 'ignore'), 'html.parser')
+
+    tag = cast(bs4.Tag, soup.find(torrent_tag_filter))
     torrent_id = get_torrent_id(tag)
     download_info_args = make_download_info_args(
         torrent_id, credentials)  # type: ignore
     r = s.get(download_info_args.url, **download_info_args.kwargs)
-    soup = BeautifulSoup(r.content.decode('utf-8', 'ignore'), 'html.parser')
-    tag = soup.find(download_tag_filter)
+    soup = bs4.BeautifulSoup(r.content.decode(
+        'utf-8', 'ignore'), 'html.parser')
+    tag = cast(bs4.Tag, soup.find(download_tag_filter))
     torrent_name = get_download_filename(tag).replace("/", "_")
     download_args = make_download_args(
         torrent_id, torrent_name, credentials)  # type: ignore

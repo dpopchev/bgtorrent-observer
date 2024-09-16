@@ -2,9 +2,9 @@
 .stamps
 .venv
 Torrent_dw_mv.log*
+Untitled.ipynb
 __pycache__
 bgtorrent_observer.egg-info
 cron.log
 notebook_pairs/ipynbs/
 retrive_episodes.config
-Untitled.ipynb
