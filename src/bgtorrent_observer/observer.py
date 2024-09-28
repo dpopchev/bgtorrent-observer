@@ -3,7 +3,11 @@ from __future__ import annotations
 import enum
 import tomllib
 from dataclasses import dataclass, replace
-from typing import Any, NamedTuple, Optional
+from typing import Any, Final, Iterable, NamedTuple, Optional
+
+CREDENTIALS_FIELD: Final[str] = 'credentials'
+USER_CREDENTIAL_FIELD: Final[str] = 'user'
+PASSWORD_CREDENTIAL_FIELD: Final[str] = 'password'
 
 
 class Tracker(enum.StrEnum):
@@ -33,7 +37,11 @@ def parse_config(config: str) -> dict[str, Any]:
     return tomllib.loads(config)
 
 
+def _get_credentials(entry: dict[str, str]) -> tuple[str, str]:
+    """return credentials from config entry the order user, password"""
+    return entry[USER_CREDENTIAL_FIELD], entry[PASSWORD_CREDENTIAL_FIELD]
+
+
 def make_tracker_credentials(tracker: Tracker, config: dict[str, Any]) -> RequestCredentials:
     """make tracker credentials using configuration representation"""
-    return RequestCredentials(*(config[tracker.value]['credentials'][e]
-                                for e in ('user', 'password')))
+    return RequestCredentials(*_get_credentials(config[tracker.value][CREDENTIALS_FIELD]))
