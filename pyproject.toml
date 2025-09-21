@@ -1,17 +1,17 @@
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "bgtorrent_observer"
-version = "0.0.1"
-requires-python = ">=3.12"
+name = "bgtorrent-observer"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Dimitar Popchev",email = "dpopchev@gmail.com"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.10"
 dependencies = [
-    'requests', 'beautifulsoup4'
 ]
 
-[tool.setuptools.package-data]
-"bgtorrent_observer" = ["py.typed"]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
