@@ -95,8 +95,11 @@ $(pyproject):
 
 .PHONY: help-poetry ###
 help-poetry:
+	@echo "=== PROJECT SETUP ==="
 	@echo "poetry new my_project # Create a new Python project with default structure"
 	@echo "poetry init # Initialize Poetry in an existing folder with interactive prompts"
+	@echo ""
+	@echo "=== DEPENDENCY MANAGEMENT ==="
 	@echo "poetry add requests # Add a production dependency"
 	@echo "poetry add --group dev pytest # Add a development-only dependency"
 	@echo "poetry remove requests # Remove a dependency"
@@ -105,11 +108,15 @@ help-poetry:
 	@echo "poetry update # Update dependencies to latest allowed versions"
 	@echo "poetry update requests # Update a specific dependency"
 	@echo "poetry lock # Regenerate poetry.lock without installing"
+	@echo ""
+	@echo "=== ENVIRONMENT MANAGEMENT ==="
 	@echo "poetry shell # Spawn a new shell with the virtual environment active"
 	@echo "poetry config virtualenvs.in-project true # Store venv inside project folder"
 	@echo "poetry env list # List all virtual environments for the project"
 	@echo "poetry env remove python3.11 # Remove a specific virtual environment"
 	@echo "poetry env info --path # Show the path to the active virtual environment"
+	@echo ""
+	@echo "=== RUN COMMANDS ==="
 	@echo "poetry run python main.py # Run a Python script inside the Poetry venv"
 	@echo "poetry run python # Start an interactive Python REPL in the venv"
 	@echo "poetry run pytest -v # Run tests with Pytest using venv dependencies"
