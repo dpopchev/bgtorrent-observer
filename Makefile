@@ -82,9 +82,13 @@ setup-poetry:
 	poetry config virtualenvs.in-project true
 
 pyproject := pyproject.toml
+venv := .venv
 
 .PHONY: init-poetry ###
-init-poetry: $(pyproject)
+init-poetry: $(pyproject) $(venv)
+
+$(venv): $(pyproject)
+	poetry install
 
 $(pyproject):
 	poetry init
@@ -197,7 +201,6 @@ $(readme):
 
 .PHONY: venv ### build local python environment
 
-venv := .venv
 pyseed ?= $(shell command -v python3 2> /dev/null)
 python := $(venv)/bin/python
 pip := $(venv)/bin/pip
