@@ -93,6 +93,17 @@ $(venv): $(pyproject)
 $(pyproject):
 	poetry init
 
+.PHONY: help-poetry ###
+help-poetry:
+	@echo "poetry add PACKAGENAME # adds production package"
+	@echo "poetry add --group dev pytest # adds package for development"
+	@echo "poetry remove PACKAGENAME # remove production package"
+	@echo "poetry remove --group dev pytest # remove package for development"
+	@echo "poetry install # full environment setup"
+	@echo "poetry install --without dev # skip development dependencies"
+	@echo "poetry install --only dev # only development dependencies"
+	@echo "poetry update # get latest versions of ALL or specific packages or groups"
+
 .PHONY: init ### template python project tracked with git
 
 stamps := .stamps
