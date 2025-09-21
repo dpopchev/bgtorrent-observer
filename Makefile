@@ -77,7 +77,9 @@ install-poetry-completion-bash:
 	poetry completions bash >> ~/.bash_completion
 	poetry completions bash > ${XDG_DATA_HOME:-~/.local/share}/bash-completion/completions/poetry
 
-
+.PHONY: setup-poetry ###
+setup-poetry:
+	poetry config virtualenvs.in-project true
 
 .PHONY: init ### template python project tracked with git
 
