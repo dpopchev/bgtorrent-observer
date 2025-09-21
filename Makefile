@@ -65,14 +65,19 @@ define del_line
 endef
 
 .PHONY: install-poetry-curl
+install-poetry-curl:
 	curl -sSL https://install.python-poetry.org | python3 -
 
 .PHONY: install-poetry-pip
+install-poetry-pip:
 	pip install poetry
 
 .PHONY: install-poetry-completion-bash
+install-poetry-completion-bash:
 	poetry completions bash >> ~/.bash_completion
 	poetry completions bash > ${XDG_DATA_HOME:-~/.local/share}/bash-completion/completions/poetry
+
+
 
 .PHONY: init ### template python project tracked with git
 
