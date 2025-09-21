@@ -81,6 +81,14 @@ install-poetry-completion-bash:
 setup-poetry:
 	poetry config virtualenvs.in-project true
 
+pyproject := pyproject.toml
+
+.PHONY: init-poetry ###
+init-poetry: $(pyproject)
+
+$(pyproject):
+	poetry init
+
 .PHONY: init ### template python project tracked with git
 
 stamps := .stamps
@@ -88,7 +96,6 @@ source_code := src
 tests := tests
 workspace := workspace
 requirements := requirements
-packagerc := pyproject.toml
 license := LICENSE
 readme := README.md
 gitignore := .gitignore
