@@ -64,15 +64,15 @@ define del_line
 	fi
 endef
 
-.PHONY: install-poetry-curl
+.PHONY: install-poetry-curl ###
 install-poetry-curl:
 	curl -sSL https://install.python-poetry.org | python3 -
 
-.PHONY: install-poetry-pip
+.PHONY: install-poetry-pip ###
 install-poetry-pip:
 	pip install poetry
 
-.PHONY: install-poetry-completion-bash
+.PHONY: install-poetry-completion-bash ###
 install-poetry-completion-bash:
 	poetry completions bash >> ~/.bash_completion
 	poetry completions bash > ${XDG_DATA_HOME:-~/.local/share}/bash-completion/completions/poetry
