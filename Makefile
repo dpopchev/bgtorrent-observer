@@ -1,493 +1,345 @@
-MAKEFLAGS += --warn-undefined-variables
-MAKEFLAGS += --check-symlink-times
+.SUFFIXES:
+.DELETE_ON_ERROR:
 
-SHELL := bash
+SHELL := /usr/bin/env bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-.DELETE_ON_ERROR:
-.SUFFIXES:
+MAKEFLAGS += --warn-undefined-variables
+MAKEFLAGS += --no-builtin-rules --no-builtin-variables
+MAKEFLAGS += --output-sync=target
+MAKEFLAGS += --check-symlink-times
 
 .DEFAULT_GOAL := help
 
-.PHONY: help ### show this menu
-help:
-	@sed -nr '/#{3}/{s/\.PHONY:/--/; s/\ *#{3}/:/; p;}' ${MAKEFILE_LIST} | sort
+DEFAULT_DEV_PKGS := pytest pytest-cov pytest-mock pytest-datafiles pytest-datadir
+DEFAULT_DEV_PKGS += mypy black isort
+DEFAULT_DEV_PKGS += pylint pylint_junit
 
-FORCE:
+DEFAULT_JUPYTER_PKGS := jupyterlab-vim jupyterlab-lsp jupytext jupyterlab
 
-inspect-%: FORCE
-	@echo $($*)
+DEFAULT_TENSORBOARD_PKGS := tensorboard
 
-# logging uses it to evaluate terminal width if present; else fullbacks to 80
-TERM ?=
+SELF_CHECK_TARGETS := bootstrap venv lock
+SELF_CHECK_TARGETS += install install-dev install-all
+SELF_CHECK_TARGETS += update update-all sync
+SELF_CHECK_TARGETS += setup setup-dev setup-all
+SELF_CHECK_TARGETS += install-jupyter run-jupyter
+SELF_CHECK_TARGETS += install-tensorboard run-tensorboard
+SELF_CHECK_TARGETS += lint format typecheck test coverage quality
+SELF_CHECK_TARGETS += clean
 
-# logging status messages with fixed length of 4
-donestr := done
-failstr := fail
-infostr := info
-warnstr := warn
+# ANSI codes for pretty print
+# example usage: $(BOLD)$(BLUE) this text $(RESET) something else
+BOLD   := \\033[1m
+BLUE   := \\033[34m
+GREEN  := \\033[32m
+RED    := \\033[31m
+RESET  := \\033[0m
 
-# Logging function: [STATUS] Message (truncated to fit terminal width)
-define log
-	if [ ! -z "$(TERM)" ]; then \
-		max_msg_width=$$(($$(tput cols) - 6 - 10)); \
-		status="[$(2)]"; \
-		msg="$(1)"; \
-		if [[ "$${#msg}" -gt $$max_msg_width ]]; then \
-			msg="$$(echo "$$msg" | cut -c1-$$max_msg_width)..."; \
-		fi; \
-		printf "%s %s\n" "$$status" "$$msg"; \
-	else \
-		max_msg_width=$$((40 - 6 - 10)); \
-		status="[$(2)]"; \
-		msg="$(1)"; \
-		if [[ "$${#msg}" -gt $$max_msg_width ]]; then \
-			msg="$$(echo "$$msg" | cut -c1-$$max_msg_width)..."; \
-		fi; \
-		printf "%s %s\n" "$$status" "$$msg"; \
-	fi
-endef
+log = printf "%b\n" "$(BOLD)$(1)$(2)$(RESET)"
+log_info = $(call log,$(BLUE),$(1))
+log_ok = $(call log,$(GREEN),$(1))
+log_nok = $(call log,$(RED),$(1))
 
-# add line and preserve uniqueness of the file,
-# useful for gitignore and a-like
+DEFAULT_PY := $(shell command -v python3)
+PYMANAGER := poetry
+SRC_DIR := src
+TESTS_DIR := tests
+GITIGNORE := .gitignore
+NOTEBOOKS_DIR := notebooks
+WORKDIR := workdir
+TENSORBOARDLOGS := $(WORKDIR)/tensorboard
+
+# Project metadata
+PYPROJECT := pyproject.toml
+LOCKFILE := poetry.lock
+PYVER := .python-version
+VENV := .venv
+README := README.md
+
+# Stamps
+STAMPS_DIR := .stamps
+STAMP_PYVER := $(STAMPS_DIR)/python-version.stamp
+
+$(STAMPS_DIR) $(WORKDIR):
+	@mkdir -p $@
+	@$(call add_line,$@/,$(GITIGNORE))
+
+$(SRC_DIR):
+	@mkdir -p $@/$(notdir $(CURDIR))
+	@touch $@/$(notdir $(CURDIR))/__init__.py
+
+$(TESTS_DIR):
+	@mkdir -p $@
+	@touch $@/__init__.py
+
+$(NOTEBOOKS_DIR):
+	@mkdir -p $@
+
 define add_line
-	echo $(1) >> $(2);\
-	sort --unique --output $(2){,}
+	if ! grep -Fxq "$(1)" "$(2)" 2>/dev/null; then \
+		echo "$(1)" >> "$(2)"; \
+		awk '!seen[$$0]++' "$(2)" > "$(2).tmp" && mv "$(2).tmp" "$(2)"; \
+	fi
 endef
 
-# del line and preserve uniqueness of the file,
-# useful for gitignore and a-like
 define del_line
-	if [[ -e $(2) ]]; then \
-		sed --in-place '\,\b$(1)\b,d' $(2);\
-		sort --unique --output $(2){,};\
+	if [ -e "$(2)" ]; then \
+		grep -Fxv "$(1)" "$(2)" | awk '!seen[$$0]++' > "$(2).tmp"; \
+		mv "$(2).tmp" "$(2)"; \
 	fi
 endef
 
-.PHONY: install-poetry-curl ###
-install-poetry-curl:
-	curl -sSL https://install.python-poetry.org | python3 -
+### Project Management
 
-.PHONY: install-poetry-pip ###
-install-poetry-pip:
-	pip install poetry
+.PHONY: bootstrap
+bootstrap: ### Scaffold project (set python-version; create pyproject, lockfile, README and directory layout)
+bootstrap: $(PYVER) $(PYPROJECT) $(LOCKFILE) $(README) $(SRC_DIR) $(TESTS_DIR)
+bootstrap: $(GITIGNORE)
 
-.PHONY: install-poetry-completion-bash ###
-install-poetry-completion-bash:
-	poetry completions bash >> ~/.bash_completion
-	poetry completions bash > ${XDG_DATA_HOME:-~/.local/share}/bash-completion/completions/poetry
+.PHONY: venv
+venv: $(VENV) ### Refresh virtual environment (sync with python-version and lockfile)
 
-.PHONY: setup-poetry ###
-setup-poetry:
-	poetry config virtualenvs.in-project true
+$(VENV): $(STAMP_PYVER) | $(STAMPS_DIR)
+	@$(call log_info,Creating virtual environment...)
+	$(PYMANAGER) config virtualenvs.in-project true
+	$(PYMANAGER) env use $$(cat $(PYVER))
+	@$(call add_line,$(VENV)/,$(GITIGNORE))
+	@$(call log_ok,Virtual environment ready)
 
-pyproject := pyproject.toml
-venv := .venv
-
-.PHONY: init-poetry ###
-init-poetry: $(pyproject) $(venv)
-
-$(venv): $(pyproject)
-	poetry install
-
-$(pyproject):
-	poetry init
-
-.PHONY: help-poetry ###
-help-poetry:
-	@echo "=== PROJECT SETUP ==="
-	@echo "poetry new my_project # Create a new Python project with default structure"
-	@echo "poetry init # Initialize Poetry in an existing folder with interactive prompts"
-	@echo ""
-	@echo "=== DEPENDENCY MANAGEMENT ==="
-	@echo "poetry add requests # Add a production dependency"
-	@echo "poetry add --group dev pytest # Add a development-only dependency"
-	@echo "poetry remove requests # Remove a dependency"
-	@echo "poetry install # Install dependencies from pyproject.toml/poetry.lock"
-	@echo "poetry install --without dev # Install only production dependencies"
-	@echo "poetry update # Update dependencies to latest allowed versions"
-	@echo "poetry update requests # Update a specific dependency"
-	@echo "poetry lock # Regenerate poetry.lock without installing"
-	@echo ""
-	@echo "=== ENVIRONMENT MANAGEMENT ==="
-	@echo "poetry shell # Spawn a new shell with the virtual environment active"
-	@echo "poetry config virtualenvs.in-project true # Store venv inside project folder"
-	@echo "poetry env list # List all virtual environments for the project"
-	@echo "poetry env remove python3.11 # Remove a specific virtual environment"
-	@echo "poetry env info --path # Show the path to the active virtual environment"
-	@echo ""
-	@echo "=== RUN COMMANDS ==="
-	@echo "poetry run python main.py # Run a Python script inside the Poetry venv"
-	@echo "poetry run python # Start an interactive Python REPL in the venv"
-	@echo "poetry run pytest -v # Run tests with Pytest using venv dependencies"
-	@echo "poetry run python manage.py runserver # Start Django dev server in venv"
-	@echo "poetry run black src/ # Format code with Black from the venv"
-	@echo "poetry run say-hello # Run a script/entry point defined in pyproject.toml"
-	@echo "poetry run http GET https://example.com # Use CLI tool (httpie) from venv"
-	@echo "poetry run flake8 src/ # Lint code with Flake8 from the venv"
-	@echo "poetry run mypy src/ # Run type checks with MyPy from the venv"
-	@echo "poetry run coverage run -m pytest # Run tests with coverage tracking"
-	@echo "poetry run coverage report -m # Show coverage report"
-	@echo "poetry run uvicorn app.main:app --reload # Start FastAPI dev server"
-	@echo "poetry run celery -A tasks worker --loglevel=info # Start Celery worker"
-
-.PHONY: init ### template python project tracked with git
-
-stamps := .stamps
-source_code := src
-tests := tests
-workspace := workspace
-requirements := requirements
-license := LICENSE
-readme := README.md
-gitignore := .gitignore
-
-init: $(packagerc) $(license) $(readme) | $(source_code) $(tests) $(workspace) $(requirements) $(stamps)
-	@git init > /dev/null
-	@$(call log,git initialized,$(donestr))
-	@$(call log,rename <PACKAGENAME> placeholder in $(packagerc) and $(readme),$(warnstr))
-	@$(call log,config local git user attrs: name and email,$(warnstr))
-
-$(source_code) $(tests) $(requirements):
-	@mkdir -p $@
-
-$(stamps) $(workspace):
-	@mkdir -p $@
-	@$(call add_line,$@,$(gitignore))
-	@$(call log,git will ignore $@,$(donestr))
-
-$(packagerc):
-	@echo '[build-system]' > $@
-	@echo 'requires = ["setuptools"]' >> $@
-	@echo 'build-backend = "setuptools.build_meta"' >> $@
-	@echo '' >> $@
-	@echo '[project]' >> $@
-	@echo 'name = "<PACKAGENAME>"' >> $@
-	@echo 'version = "0.0.1"' >> $@
-	@echo 'requires-python = ">=$(shell ($(python) --version 2> /dev/null || echo "3.10") | grep -oP "\d.\d+")"' >> $@
-	@echo 'dependencies = ["toolz"]' >> $@
-	@echo '' >> $@
-	@echo '[tool.setuptools.package-data]' >> $@
-	@echo '"<PACKAGENAME>" = ["py.typed"]' >> $@
-	@echo '' >> $@
-	@echo '[tool.setuptools.packages.find]' >> $@
-	@echo 'where = ["src"]' >> $@
-	@echo '' >> $@
-	@echo '[tool.distutils.egg_info]' >> $@
-	@echo 'egg_base = "$(workspace)"' >> $@
-	@echo '' >> $@
-	@echo '[tool.pytest.ini_options]' >> $@
-	@echo 'addopts = "--quiet -rfE --showlocals --doctest-modules --doctest-continue-on-failure --cov=src --cov-branch"' >> $@
-	@echo 'testpaths = ["src", "tests"]' >> $@
-	@echo 'doctest_optionflags = "NORMALIZE_WHITESPACE ELLIPSIS"' >> $@
-	@echo '' >> $@
-	@echo '[tool.pylint]' >> $@
-	@echo 'max-line-length = 80' >> $@
-	@echo 'good-names = ["df", "np"]' >> $@
-	@echo '' >> $@
-	@echo '[tool.black]' >> $@
-	@echo 'line-length = 80' >> $@
-	@echo "include = '\.pyi?$$'" >> $@
-	@echo "extend-exclude = '\( $(workspace) \)'" >> $@
-	@echo '' >> $@
-	@echo '[tool.isort]' >> $@
-	@echo 'profile = "black"' >> $@
-	@echo '' >> $@
-	@echo '[tool.mypy]' >> $@
-	@echo 'disallow_untyped_defs = true' >> $@
-	@echo 'show_error_codes = true' >> $@
-	@echo 'no_implicit_optional = true' >> $@
-	@echo 'warn_return_any = true' >> $@
-	@echo 'warn_unused_ignores = true' >> $@
-	@echo 'exclude = ["scripts", "workspace", "tests"]' >> $@
-	@echo '' >> $@
-	@echo '[tool.pyright]' >> $@
-	@echo 'reportMissingTypeArgument = true' >> $@
-	@echo 'strictListInference = true' >> $@
-	@$(call log,$@ template created,$(donestr))
-
-$(license):
-	@echo 'MIT License' > $@
-	@echo '[get the text](https://choosealicense.com/licenses/mit/)' >> $@
-	@$(call log,$@ template created,$(donestr))
-
-$(readme):
-	@echo '# <PACKAGENAME>' > $@
-	@echo 'Elevator pitch.' >> $@
-	@echo '' >> $@
-	@echo '## Install' >> $@
-	@echo '```' >> $@
-	@echo 'git clone --depth 1 <URL>' >> $@
-	@echo 'cd <PACKAGENAME>' >> $@
-	@echo 'make dev' >> $@
-	@echo 'make check' >> $@
-	@echo '```' >> $@
-	@echo 'If more context is needed then rename section to `Installation`.' >> $@
-	@echo 'Put details into `Requirements` and `Install` subsections.' >> $@
-	@echo '' >> $@
-	@echo '## Usage' >> $@
-	@echo 'Place examples with expected output.' >> $@
-	@echo 'Start with `Setup` subsection for configuration.' >> $@
-	@echo 'Break intu sub-...subsections using scenario/feature names.' >> $@
-	@echo '' >> $@
-	@echo '## Acknowledgment' >> $@
-	@echo '- [makeareadme](https://www.makeareadme.com/)' >> $@
-	@echo '' >> $@
-	@echo '## License' >> $@
-	@echo '[MIT](LICENSE)' >> $@
-	@$(call log,$@ template created,$(donestr))
-
-.PHONY: venv ### build local python environment
-
-pyseed ?= $(shell command -v python3 2> /dev/null)
-python := $(venv)/bin/python
-pip := $(venv)/bin/pip
-requirements-pip := $(requirements)/pip.txt
-stamp-venv := $(stamps)/venv
-stamp-venv-requirements := $(stamps)/venv-requirements
-
-venv: $(stamp-venv) $(stamp-venv-requirements)
-
-$(stamp-venv): $(python) | $(stamps)
-	@touch $@
-
-$(python):
-	@$(pyseed) -m venv $(venv)
-	@$(call add_line,$(venv),$(gitignore))
-	@$(call add_line,__pycache__,$(gitignore))
-	@$(call add_line,*.py[cod],$(gitignore))
-	@$(call log,venv created using $(pyseed),$(donestr))
-
-$(stamp-venv-requirements): $(requirements-pip) | $(stamps)
-	@$(pip) install -r $(requirements-pip)
-	@$(call log,required pip installed,$(donestr))
-	@touch $@
-
-$(requirements-pip): | $(requirements)
-	@$(pip) install --upgrade pip > /dev/null
-	@$(pip) freeze --all | grep 'pip==' > $@
-	@$(call log,pip version requirment set,$(donestr))
-	@$(pip) install --upgrade build > /dev/null
-
-.PHONY: clean-venv ###
-clean-venv:
-	@rm -rf $(venv)
-
-.PHONY: dev ### make development python environment
-
-requirements-dev := $(requirements)/dev.txt
-stamp-dev := $(stamps)/dev
-stamp-dev-requirements := $(stamps)/dev-requirements
-
-dev: $(stamp-dev) $(stamp-dev-requirements)
-
-$(stamp-dev): $(stamp-venv) | $(stamps)
-	@$(pip) install --force-reinstall --editable . > /dev/null
-	@$(call log,package installed into $(venv),$(donestr))
-	@touch $@
-
-$(stamp-dev-requirements): $(stamp-venv) $(requirements-dev) | $(stamps)
-	@$(pip) install -r $(requirements-dev) > /dev/null
-	@$(call log,development requirements installed,$(donestr))
-	@touch $@
-
-_init_dev_requirements := pytest pytest-cov pytest-mock pytest-datafiles pytest-datadir
-_init_dev_requirements += mypy
-_init_dev_requirements += black isort
-_init_dev_requirements += pylint pylint_junit
-_init_dev_requirements += pynvim
-
-$(requirements-dev): | $(requirements)
-	@for p in $(_init_dev_requirements); do \
-		$(pip) install --upgrade $$p > /dev/null; \
-		$(call add_line,$$($(pip) freeze | grep "$$p=="),$@); \
-		$(call log,$$p installed,$(donestr)); \
-	done
-
-package ?=
-
-.PHONY: add-dev-requirment ### add development required package, e.g. make add-dev-requirements-dev package=...
-add-dev-requirment:
-	@if [[ -z "$(package)" ]]; then \
-		$(call log,missing package name see help,$(failstr)); \
-		exit 1;\
+$(STAMP_PYVER): $(PYVER) | $(STAMPS_DIR)
+	@$(call log_info,Checking Python version...)
+	@if [ -d $(VENV) ]; then \
+		CURRENT=$$($(VENV)/bin/python -V 2>/dev/null || echo none); \
+		REQUIRED="Python $$(cat $(PYVER))"; \
+		if [ "$$CURRENT" != "$$REQUIRED" ]; then \
+		$(call log_nok,Python version drift \($$CURRENT vs $$REQUIRED\), removing $(VENV)); \
+		rm -rf $(VENV); \
+	else \
+		$(call log_ok,Virtualenv Python version matches expectations); \
+	fi; \
 	fi
-	@$(pip) install --upgrade $(package) > /dev/null
-	@$(call del_line,$(package),$(requirements-dev))
-	@$(call add_line,$$($(pip) freeze | grep "$(package)=="),$(requirements-dev))
-	@$(call log,$$($(pip) freeze | grep "$(package)==") installed and pinned,$(donestr))
-	@touch $(stamp-dev-requirements)
-
-.PHONY: del-dev-requirment ### del development required package, e.g. make del-dev-requirements-dev package=...
-del-dev-requirment:
-	@if [[ -z "$(package)" ]]; then \
-		$(call log,missing package name see help,$(failstr)); \
-		exit 1;\
-	fi
-	@$(pip) uninstall -y $(package) > /dev/null
-	@$(call del_line,$(package),$(requirements-dev))
-	@$(call log,$(package) uninstalled and unpinned,$(donestr))
-	@touch $(stamp-dev-requirements)
-
-.PHONY: check ### format then test and lint
-check: format test lint
-	@$(call log,$@ completed,$(donestr))
-
-.PHONY: format ###
-format: $(python)
-	@$(python) -m black .
-	@$(python) -m isort --quiet --atomic .
-	@$(call log,$@ completed,$(donestr))
-
-.PHONY: test ### doctest and unittest with coverage and static code check
-test: mypy $(python)
-	@$(python) -m pytest
-	@$(call add_line,.coverage,$(gitignore))
-	@$(call log,$@ completed,$(donestr))
-
-.PHONY: mypy ### static code check
-mypy: $(python)
-	@$(python) -m mypy --pretty --strict $(source_code)
-	@$(call log,$@ completed,$(donestr))
-
-.PHONY: lint ###
-lint: $(python)
-	@$(python) -m pylint $(source_code)
-	@$(call log,$@ completed,$(donestr))
-
-.PHONY: dist ### create distribution file
-dist: $(python)
-	@$(python) -m build --outdir $(workspace) --wheel > /dev/null
-	@$(call log,dist wheel build at $(workspace),$(donestr))
-
-.PHONY: run-test-daemon ### rerun test on change of any package
-run-test-daemon:
-	@find $(source_code) -name '*.py' | entr make test
-
-.PHONY: jupyter ###
-
-jupyter := $(venv)/bin/jupyter
-requirements-jupyter := $(requirements)/jupyter.txt
-stamp-jupyter := $(stamps)/jupyter
-stamp-jupyter-requirements := $(stamps)/jupyter-requirements
-notebooks := notebooks
-
-$(notebooks):
-	@mkdir -p $@
-
-jupyter: $(stamp-jupyter) $(stamp-jupyter-requirements)
-
-$(stamp-jupyter): $(stamp-venv) $(jupyter) | $(stamps)
 	@touch $@
 
-$(jupyter):
-	@$(pip) install --upgrade jupyterlab > /dev/null
-	@$(call add_line,*.ipynb,$(gitignore))
-	@$(call add_line,.ipynb_checkpoints/,$(gitignore))
-	@$(call log,jupyterlab installed,$(donestr))
+$(LOCKFILE): $(PYPROJECT)
+	@$(call log_info,Generating lockfile...)
+	$(PYMANAGER) lock
+	@$(call log_ok,Created $@)
 
-$(stamp-jupyter-requirements): $(requirements-jupyter) | $(stamps)
-	@$(pip) install -r $(requirements-jupyter) > /dev/null
-	@$(call log,jupyter requirements installed,$(donestr))
-	@$(jupyter) lab build
-	@touch $@
+$(PYVER):
+	@$(call log_info,Choose Python interpreter $(RESET)[$(GREEN)$(DEFAULT_PY)$(RESET)]: )
+	@read -r PY; \
+		if [ -z "$$PY" ]; then PY="$(DEFAULT_PY)"; fi; \
+		PY_PATH=$$(command -v $$PY || true); \
+		if [ -z "$$PY_PATH" ] || [ ! -x "$$PY_PATH" ]; then \
+		$(call log_nok,Python interpreter error: $$PY not executable); \
+		exit 1; \
+		fi; \
+	PY_VER=$$($$PY_PATH -V | awk '{print $$2}'); \
+	echo "$$PY_VER" > $@;
 
-_init_jupyter_requirements := jupyterlab-vim
-_init_jupyter_requirements += jupyterlab-lsp
-_init_jupyter_requirements += jupytext
+$(PYPROJECT):
+	$(PYMANAGER) init
 
-$(requirements-jupyter): | $(requirements)
-	@$(pip) freeze --all | grep 'jupyterlab==' > $@
-	@for p in $(_init_jupyter_requirements); do \
-		$(pip) install --upgrade $$p > /dev/null; \
-		$(call add_line,$$($(pip) freeze | grep "$$p=="),$@); \
-		$(call log,$$p installed,$(donestr)); \
-	done
-	@$(call log,jupyter version requirment set,$(donestr))
+$(README):
+	@echo "# $(notdir $(CURDIR))" > $@
+	@echo "Elevator pitch." >> $@
+	@echo "" >> $@
+	@echo "## Install" >> $@
+	@echo '```bash' >> $@
+	@echo "git clone --depth 1 <URL>" >> $@
+	@echo "cd $(notdir $(CURDIR))" >> $@
+	@echo "make setup # see help for more" >> $@
+	@echo '```' >> $@
+	@echo "If more context is needed then rename section to \`Installation\`." >> $@
+	@echo "Put details into \`Requirements\` and \`Install\` subsections." >> $@
+	@echo "" >> $@
+	@echo "## Usage" >> $@
+	@echo "Place examples with expected output." >> $@
+	@echo "Start with \`Setup\` subsection for configuration." >> $@
+	@echo "Break into subsections using scenario/feature names." >> $@
+	@echo "" >> $@
+	@echo "## Acknowledgment" >> $@
+	@echo "- [makeareadme](https://www.makeareadme.com/)" >> $@
+	@echo "" >> $@
+	@$(call log_ok,$@ template created)
 
-.PHONY: run-jupyter ###
-run-jupyter: $(stamp-jupyter) $(stamp-jupyter-requirements) | $(notebooks)
-	(source $(venv)/bin/activate && $(jupyter) lab $(notebooks))
+$(GITIGNORE):
+	@$(call add_line,.venv/,$@)
+	@$(call add_line,__pycache__/,$@)
+	@$(call add_line,*.py[cod],$@)
+	@$(call add_line,*.egg-info/,$@)
+	@$(call add_line,build/,$@)
+	@$(call add_line,dist/,$@)
+	@$(call add_line,.coverage,$@)
+	@$(call add_line,htmlcov/,$@)
+	@$(call add_line,.mypy_cache/,$@)
+	@$(call add_line,.pytest_cache/,$@)
+	@$(call log_ok,$@ created)
 
-.PHONY: setup-local-nodejs ### jupyter uses nodejs, make latest lts locally available
-setup-local-nodejs:
-	@curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-	@$(call log,restart the shell,$(warnstr))
-	@$(call log,run: nvm install --lts && nvm use --lts,$(warnstr))
+.PHONY: lock
+lock: $(LOCKFILE) ### Regenerate lockfile from pyproject
 
-.PHONY: setup-pyright ### local setup of pyright, WARN: requires npm etc
+### Dependency Management
 
-stamp-npm := $(stamps)/npm
-stamp-pyright := $(stamps)/pyright
-pyrightconfig := pyrightconfig.json
-npm-packages := package.json
-npm-lock := package-lock.json
+.PHONY: install
+install: venv $(PYPROJECT) $(LOCKFILE) ### Install runtime (main) dependencies
+	@$(call log_info,Installing only runtime dependencies...)
+	$(PYMANAGER) install --only main
+	@$(call log_ok,Runtime dependencies installed)
 
-setup-pyright: $(stamp-npm) $(stamp-pyright)
+.PHONY: install-%
+install-%: venv $(PYPROJECT) $(LOCKFILE) ### Install dependencies for group '%'
+	@$(call log_info,Installing dependencies for group '$*'...)
+	$(PYMANAGER) install --with $*
+	@$(call log_ok,Dependencies for group '$*' installed)
 
-$(stamp-npm): $(npm-packages)
-	@npm install
-	@$(call log,npm packages updated,$(donestr))
-	@$(call log,consider adding to version control: $(npm-packages) $(npm-lock),$(warnstr))
-	@touch $@
+.PHONY: install-all
+install-all: venv $(PYPROJECT) $(LOCKFILE) ### Install all groups of dependencies
+	@$(call log_info,Installing all dependencies...)
+	$(PYMANAGER) install
+	@$(call log_ok,All dependencies installed)
 
-$(npm-packages):
-	@npm init -y
-	@$(call log,local npm environment initialized,$(donestr))
-	@$(call add_line,node_modules/,$(gitignore))
+.PHONY: install-dev
+install-dev: venv $(PYPROJECT) $(LOCKFILE) ### Install dependencies for dev group
+	@$(call log_info,Installing dependencies for dev group...)
+	@if ! grep -Eq '^\[tool.poetry.group.dev(\.dependencies)?\]' $(PYPROJECT); then $(PYMANAGER) add --group dev $(DEFAULT_DEV_PKGS); fi
+	$(PYMANAGER) install --with dev
+	@$(call log_ok,Dependencies for group dev installed)
 
-$(stamp-pyright):
-	@npm install pyright --save-dev
-	@echo "{" > $(pyrightconfig)
-	@echo '"include": ["."],' >> $(pyrightconfig)
-	@echo '"venvPath": ".",' >> $(pyrightconfig)
-	@echo '"venv": ".venv"' >> $(pyrightconfig)
-	@echo "}" >> $(pyrightconfig)
-	@$(call log,consider adding to version control: $(pyrightconfig),$(warnstr))
-	@touch $@
+.PHONY: install-jupyter
+install-jupyter: venv $(PYPROJECT) $(LOCKFILE) ### Install dependencies for jupyter group
+	@$(call log_info,Installing jupyter notebook...)
+	@if ! grep -Eq '^\[tool.poetry.group.jupyter(\.dependencies)?\]' $(PYPROJECT); then $(PYMANAGER) add --group jupyter $(DEFAULT_JUPYTER_PKGS); fi
+	$(PYMANAGER) install --with jupyter
+	@$(call log_ok,Dependencies for group jupyter installed)
 
-.PHONY: tensorboard ###
+.PHONY: install-tensorboard
+install-tensorboard: venv $(PYPROJECT) $(LOCKFILE) ### Install dependencies for tensorboard group
+	@$(call log_info,Installing tensorboard...)
+	@if ! grep -Eq '^\[tool.poetry.group.tensorboard(\.dependencies)?\]' $(PYPROJECT); then $(PYMANAGER) add --group tensorboard $(DEFAULT_TENSORBOARD_PKGS); fi
+	$(PYMANAGER) install --with tensorboard
+	@$(call log_ok,Dependencies for group tensorboard installed)
 
-tensorboard := $(venv)/bin/tensorboard
-requirements-tensorboard := $(requirements)/tensorboard.txt
-stamp-tensorboard := $(stamps)/tensorboard
-stamp-tensorboard-requirements := $(stamps)/tensorboard-requirements
-tensorboardlogs := $(workspace)/tensorboard
+.PHONY: update
+update: $(PYPROJECT) ### Update main dependencies (resolve new versions) and refresh venv
+	@$(call log_info,Updating dependencies to latest allowed versions)
+	$(PYMANAGER) update --only main
+	@$(MAKE) install
+	@$(call log_ok,Dependencies updated)
 
-tensorboard: $(stamp-tensorboard) $(stamp-tensorboard-requirements)
+.PHONY: update-all
+update-all: $(PYPROJECT) ### Update all dependencies (resolve new versions) and refresh venv
+	@$(call log_info,Updating dependencies to latest allowed versions)
+	$(PYMANAGER) update
+	@$(MAKE) install-all
+	@$(call log_ok,Dependencies updated)
 
-$(stamp-tensorboard): $(stamp-venv) $(tensorboard) | $(stamps)
-	@touch $@
+.PHONY: sync
+sync: venv ### Sync environment strictly to the lockfile (no upgrades)
+	@$(call log_info,Synchronizing environment with lockfile)
+	$(PYMANAGER) install --sync
+	@$(call log_ok,Environment synchronized)
 
-$(tensorboard):
-	@$(pip) install --upgrade tensorboard >> /dev/null
-	@$(call log,tensorboard installed,$(donestr))
+.PHONY: setup
+setup: bootstrap venv install ### Production project setup (scaffold + environment + package)
 
-$(stamp-tensorboard-requirements): $(requirements-tensorboard) | $(stamps)
-	@$(pip) install -r $(requirements-tensorboard)
-	@$(call log,tensorboard requirements installed,$(donestr))
-	@touch $@
+.PHONY: setup-dev
+setup-dev: bootstrap venv install-dev ### Dev project setup (scaffold + environment + package + dev group)
 
-_init_tensorboard_requirements :=
+.PHONY: setup-all
+setup-all: bootstrap venv install-all ### Full project setup (scaffold + environment + package + all groups)
 
-$(requirements-tensorboard): | $(requirements)
-	@$(pip) freeze --all | grep 'tensorboard==' > $@
-	@for p in $(_init_tensorboard_requirements); do \
-		$(pip) install --upgrade $$p > /dev/null; \
-		$(call add_line,$$($(pip) freeze | grep "$$p=="),$@); \
-		$(call log,$$p installed,$(donestr)); \
-	done
+### Run
 
-.PHONY: run-tensorboard ###
-run-tensorboard: $(stamp-tensorboard) $(stamp-tensorboard-requirements) | $(tensorboardlogs)
-	$(tensorboard) --logdir $(tensorboardlogs)
+.PHONY: run-jupyter
+run-jupyter: venv install-jupyter | $(NOTEBOOKS_DIR) ### Run jupyter lab
+	$(PYMANAGER) run jupyter lab --notebook-dir=$(NOTEBOOKS_DIR)
 
-$(tensorboardlogs):
-	@mkdir -p $@
+.PHONY: run-tensorboard
+run-tensorboard: venv install-tensorboard | $(WORKDIR) ### Run tensorboard lab
+	$(PYMANAGER) run tensorboard --logdir $(TENSORBOARDLOGS)
 
-.PHONY: clean-cache ###
-clean-cache:
-	@find . -name ".ipynb_checkpoints" -type d -exec rm -fr {} +
-	@find . -name "*.pyc" -type f -exec rm -fr {} +
-	@find . -name "__pycache__" -type d -exec rm -fr {} +
-	@rm -rf .mypy_cache .pytest_cache .coverage
+### Code Quality
+
+.PHONY: lint
+lint: ### Run linters (black, isort, pylint)
+	$(PYMANAGER) run black --check .
+	$(PYMANAGER) run isort --check-only .
+	$(PYMANAGER) run pylint $(SRC_DIR)
+
+.PHONY: format
+format: ### Auto-format code (black + isort)
+	$(PYMANAGER) run black .
+	$(PYMANAGER) run isort .
+
+.PHONY: typecheck
+typecheck: ### Run static type checks
+	$(PYMANAGER) run mypy .
+
+### Testing
+
+.PHONY: test
+test: ### Run all tests
+	$(PYMANAGER) run pytest
+
+.PHONY: coverage
+coverage: ### Run tests with coverage report
+	$(PYMANAGER) run pytest --cov=$(SRC_DIR) --cov-report=term-missing
+	@$(call add_line,.coverage,$(GITIGNORE))
+
+.PHONY: quality
+quality: lint typecheck test coverage ### Run all quality checks
+
+### Utilities
+
+.PHONY: help
+help: ### Show this help message
+	@grep -E '^(###[ ]{1,}.*|[a-zA-Z0-9_-]+:.*###)' $(MAKEFILE_LIST) \
+		| sed -E 's/^### (.*)/$(BOLD)$(BLUE)\1$(RESET)/' \
+		| sed -E 's/^([a-zA-Z0-9_-]+):.*###(.*)/    $(GREEN)\1$(RESET):\2/' \
+		| while IFS= read -r line; do printf "%b\n" "$$line"; done
+
+.PHONY: demo-logging
+demo-logging: ### logging messages demo
+	@$(call log_info,What is about to be done)
+	@$(call log_ok,Something successfully ended)
+	@$(call log_nok,Something successfully failed)
+
+
+.PHONY: selfcheck
+selfcheck: ### Verify top-level Makefile targets and show recipes only if they fail
+	@$(call log_info,Starting selfchecks\n-------------------\n)
+	@set -e; \
+	for target in $(SELF_CHECK_TARGETS); do \
+		$(call log_info,Testing target: $$target); \
+		if ! $(MAKE) -n $$target >/dev/null; then \
+			$(call log_nok,Target '$$target' failed); \
+			$(call log_info,Recipe for '$$target':); \
+			$(MAKE) -n $$target | sed 's/^/    /'; \
+			exit 1; \
+		else \
+			$(call log_ok,Target '$$target' OK); \
+		fi; \
+		echo ""; \
+		done
+	@$(call log_info,Selfcheck complete)
+
+.PHONY: clean-venv
+clean-venv: ### Remove virtual environment and stamps
+	@rm -rf $(VENV) $(STAMPS_DIR)
+
+.PHONY: clean-build
+clean-build: ### Remove build artifacts
+	@rm -rf build/ dist/ *.egg-info
+
+.PHONY: clean-pyc
+clean-pyc: ### Remove Python cache file
+	@rm -rf __pycache__/ */__pycache__/ *.py[cod]
+
+.PHONY: clean-test
+clean-test: ### Remove test artifacts
+	@rm -rf .pytest_cache/ .coverage htmlcov/ .mypy_cache/
+
+.PHONY: clean
+clean: clean-venv clean-build clean-pyc clean-test
