@@ -9,3 +9,4 @@ cron.log
 notebook_pairs/ipynbs/
 retrive_episodes.config
 *.old
+.venv/
