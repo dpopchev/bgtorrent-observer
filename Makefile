@@ -306,7 +306,6 @@ demo-logging: ### logging messages demo
 	@$(call log_ok,Something successfully ended)
 	@$(call log_nok,Something successfully failed)
 
-
 .PHONY: selfcheck
 selfcheck: ### Verify top-level Makefile targets and show recipes only if they fail
 	@$(call log_info,Starting selfchecks\n-------------------\n)
