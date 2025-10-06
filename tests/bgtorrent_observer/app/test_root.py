@@ -5,7 +5,7 @@ from bgtorrent_observer.app import app
 
 
 @pytest.fixture
-def clinet():
+def client():
     return TestClient(app)
 
 def test_get_status_code(client: TestClient):
