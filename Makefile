@@ -345,31 +345,32 @@ clean-test: ### Remove test artifacts
 docker-build: $(DOCKER_IMAGE) ### Build Docker image using distribution file and python-version
 
 $(DOCKER_IMAGE): build $(DOCKERFILE) $(PYVER) | $(DIST_DIR)
-	@$(call log_info,Building Docker image $(IMAGE_NAME):$(IMAGE_TAG) with Python $(PYTHON_VERSION)...)
-	@_PYVER=$$(cat $(PYVER)); \
+	@$(call log_info,Building Docker image $(IMAGE_NAME):$(IMAGE_TAG)...)
+	@PYVER_VAL=$$(cat $(PYVER)); \
 	docker build \
-		--build-arg PYTHON_VERSION=$(_PYVER) \
-		--build-arg WHEEL_FILE=$$(ls dist/*.whl | head -n1) \
-		-t $(IMAGE_NAME):$(IMAGE_TAG) .
+		--build-arg PYTHON_VERSION=$$PYVER_VAL \
+		-t $(IMAGE_NAME):$(IMAGE_TAG) .; \
+	rm -rf $@; \
 	docker save $(IMAGE_NAME):$(IMAGE_TAG) -o $@
 	@$(call log_ok,Docker image saved at $@)
 
 $(DOCKERFILE):
 	@$(call log_info,Missing Dockerfile, creating default...)
-	@echo 'ARG PYTHON_VERSION=$(PYTHON_VERSION)' > $@
+	@echo 'ARG PYTHON_VERSION' > $@
 	@echo 'FROM python:$${PYTHON_VERSION}-slim-bookworm' >> $@
 	@echo '' >> $@
-	@echo 'ARG WHEEL_FILE' >> $@
-	@echo '' >> $@
-	@echo 'RUN apt-get update && apt-get install -y --no-install-recommends \\' >> $@
-	@echo '    build-essential \\' >> $@
-	@echo ' && rm -rf /var/lib/apt/lists/*' >> $@
+	@echo 'RUN set -eux; apt-get update \' >> $@
+	@echo '&& apt-get install --no-install-recommends -y build-essential \' >> $@
+	@echo '&& apt-get clean && rm -rf /var/lib/apt/lists/*' >> $@
 	@echo '' >> $@
 	@echo 'WORKDIR /app' >> $@
-	@echo 'COPY $${WHEEL_FILE} /app/' >> $@
-	@echo 'RUN pip install --no-cache-dir $${WHEEL_FILE}' >> $@
+	@echo 'COPY $(DIST_DIR)/ /app/dist/' >> $@
+	@echo 'RUN set -eux; \' >> $@
+	@echo 'LATEST=$$(ls -t /app/dist/*.whl | head -n1); \' >> $@
+	@echo 'pip install --no-cache-dir "$$LATEST"; \' >> $@
+	@echo 'rm -rf /app/dist/' >> $@
 	@echo '' >> $@
-	@echo 'CMD ["python"]' >> $@
+	@echo 'CMD ["python", "-c", "print('\''Container started successfully!'\'')"]' >> $@
 	@$(call log_ok,Default Dockerfile created)
 
 .PHONY: docker-run
