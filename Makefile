@@ -55,7 +55,8 @@ DIST_DIR := dist
 DOCKERFILE := Dockerfile
 IMAGE_NAME ?= $(notdir $(CURDIR))
 IMAGE_TAG ?= latest
-DOCKER_IMAGE := $(DIST_DIR)/$(IMAGE_NAME)_$(IMAGE_TAG).tar
+DOCKER_IMAGE := $(DIST_DIR)/docker_$(IMAGE_NAME)-$(IMAGE_TAG).tar
+COMPOSE_FILE := docker-compose.yml
 
 # Project metadata
 PYPROJECT := pyproject.toml
@@ -372,9 +373,15 @@ $(DOCKERFILE):
 	@$(call log_ok,Default Dockerfile created)
 
 .PHONY: docker-run
-docker-run: docker-build ### Run container
+docker-run: ### Run container
 	@$(call log_info,Running Docker container $(IMAGE_NAME):$(IMAGE_TAG)...)
 	docker run --rm $(IMAGE_NAME):$(IMAGE_TAG)
+
+.PHONY: docker-up
+docker-up: ### Run container using a compose file
+docker-up: $(COMPOSE_FILE) $(DOCKERFILE) $(PYVER) build
+	@_PYVER=$$(cat $(PYVER)); \
+
 
 .PHONY: docker-clean
 docker-clean: ### Remove Docker image tarball and image
