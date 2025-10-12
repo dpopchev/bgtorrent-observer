@@ -51,6 +51,12 @@ WORKDIR := workdir
 TENSORBOARDLOGS := $(WORKDIR)/tensorboard
 DIST_DIR := dist
 
+# Docker
+DOCKERFILE := Dockerfile
+IMAGE_NAME ?= $(notdir $(CURDIR))
+IMAGE_TAG ?= latest
+DOCKER_IMAGE := $(DIST_DIR)/$(IMAGE_NAME)_$(IMAGE_TAG).tar
+
 # Project metadata
 PYPROJECT := pyproject.toml
 LOCKFILE := poetry.lock
@@ -332,6 +338,60 @@ clean-pyc: ### Remove Python cache file
 clean-test: ### Remove test artifacts
 	@rm -rf .pytest_cache/ .coverage htmlcov/ .mypy_cache/
 
+### Utilities-Docker
+
+.PHONY: docker-build
+docker-build: $(DOCKER_IMAGE) ### Build Docker image using distribution file and python-version
+
+$(DOCKER_IMAGE): build $(DOCKERFILE) $(PYVER) | $(DIST_DIR)
+	@$(call log_info,Building Docker image $(IMAGE_NAME):$(IMAGE_TAG) with Python $(PYTHON_VERSION)...)
+	@_PYVER=$$(cat $(PYVER)); \
+	docker build \
+		--build-arg PYTHON_VERSION=$(_PYVER) \
+		--build-arg WHEEL_FILE=$$(ls dist/*.whl | head -n1) \
+		-t $(IMAGE_NAME):$(IMAGE_TAG) .
+	docker save $(IMAGE_NAME):$(IMAGE_TAG) -o $@
+	@$(call log_ok,Docker image saved at $@)
+
+$(DOCKERFILE):
+	@$(call log_info,Missing Dockerfile, creating default...)
+	@echo 'ARG PYTHON_VERSION=$(PYTHON_VERSION)' > $@
+	@echo 'FROM python:$${PYTHON_VERSION}-slim-bookworm' >> $@
+	@echo '' >> $@
+	@echo 'ARG WHEEL_FILE' >> $@
+	@echo '' >> $@
+	@echo 'RUN apt-get update && apt-get install -y --no-install-recommends \\' >> $@
+	@echo '    build-essential \\' >> $@
+	@echo ' && rm -rf /var/lib/apt/lists/*' >> $@
+	@echo '' >> $@
+	@echo 'WORKDIR /app' >> $@
+	@echo 'COPY $${WHEEL_FILE} /app/' >> $@
+	@echo 'RUN pip install --no-cache-dir $${WHEEL_FILE}' >> $@
+	@echo '' >> $@
+	@echo 'CMD ["python"]' >> $@
+	@$(call log_ok,Default Dockerfile created)
+
+.PHONY: docker-run
+docker-run: docker-build ### Run container
+	@$(call log_info,Running Docker container $(IMAGE_NAME):$(IMAGE_TAG)...)
+	docker run --rm $(IMAGE_NAME):$(IMAGE_TAG)
+
+.PHONY: docker-clean
+docker-clean: ### Remove Docker image tarball and image
+	@$(call log_info,Cleaning Docker artifacts...)
+	@rm -rf $(DOCKER_IMAGE)
+	@docker rmi -f $(IMAGE_NAME):$(IMAGE_TAG) || true
+	@$(call log_ok,Docker artifacts cleaned)
+
+### Utilities
+
+.PHONY: help
+help: ### Show this help message
+	@grep -E '^(###[ ]{1,}.*|[a-zA-Z0-9_-]+:.*###)' $(MAKEFILE_LIST) \
+		| sed -E 's/^### (.*)/$(BOLD)$(BLUE)\1$(RESET)/' \
+		| sed -E 's/^([a-zA-Z0-9_-]+):.*###(.*)/    $(GREEN)\1$(RESET):\2/' \
+		| while IFS= read -r line; do printf "%b\n" "$$line"; done
+
 .PHONY: demo-logging
 demo-logging: ### logging messages demo
 	@$(call log_info,What is about to be done)
@@ -355,33 +415,6 @@ selfcheck: ### Verify top-level Makefile targets and show recipes only if they f
 		echo ""; \
 		done
 	@$(call log_info,Selfcheck complete)
-
-.PHONY: tests-structure
-tests-structure: ### Create test directories mirroring src modules
-	@find $(SRC_DIR) -type f -name "*.py" ! -name "__*__.py" | while read f; do \
-		p=$${f#$(SRC_DIR)/}; \
-		m=$${p%.py}; \
-		t=$(TESTS_DIR)/$${m}; \
-		mkdir -p "$$t"; \
-		$(call log_ok,Created $$t); \
-		done
-
-.PHONY: clean-venv
-clean-venv: ### Remove virtual environment and stamps
-	@rm -rf $(VENV) $(STAMPS_DIR)
-
-.PHONY: clean-build
-clean-build: ### Remove build artifacts
-	@rm -rf build/ $(DIST_DIR) *.egg-info
-
-.PHONY: clean-pyc
-clean-pyc: ### Remove Python cache file
-	@find $(SRC_DIR) $(TESTS_DIR) -type d -name '__pycache__' -exec rm -rf {} +
-	@find $(SRC_DIR) $(TESTS_DIR) -type d -name '*.py[co]' -delete
-
-.PHONY: clean-test
-clean-test: ### Remove test artifacts
-	@rm -rf .pytest_cache/ .coverage htmlcov/ .mypy_cache/
 
 .PHONY: clean
 clean: clean-venv clean-build clean-pyc clean-test docker-clean
