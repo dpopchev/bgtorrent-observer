@@ -1,5 +1,28 @@
+version: "3.9"
+
 services:
-  web:
-    build: .
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION}
+    image: bgtorrent-observer:latest
+    env_file:
+      - .env
+    environment:
+      APP_ENV: ${APP_ENV}
+      LOG_LEVEL: ${LOG_LEVEL}
+      DEBUG: ${DEBUG}
+      TZ: ${TZ}
+      DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      API_TOKEN: ${API_TOKEN}
+      FEATURE_X_ENABLED: ${FEATURE_X_ENABLED}
+      MOCK_MODE: ${MOCK_MODE}
     ports:
-      - "8000:8000"
+      - "${PORT}:${PORT}"
+    volumes:
+      - ./data:${DATA_DIR}
+      - ${CACHE_DIR}:/cache
+    command: ["python", "-c", "print('Composed successfully!')"]
