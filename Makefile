@@ -292,7 +292,17 @@ coverage: ### Run tests with coverage report
 .PHONY: quality
 quality: lint typecheck test coverage ### Run all quality checks
 
-### Utilities
+### Utilities-Python
+
+.PHONY: tests-structure
+tests-structure: ### Create test directories mirroring src modules
+	@find $(SRC_DIR) -type f -name "*.py" ! -name "__*__.py" | while read f; do \
+		p=$${f#$(SRC_DIR)/}; \
+		m=$${p%.py}; \
+		t=$(TESTS_DIR)/$${m}; \
+		mkdir -p "$$t"; \
+		$(call log_ok,Created $$t); \
+		done
 
 .PHONY: help
 help: ### Show this help message
@@ -363,4 +373,4 @@ clean-test: ### Remove test artifacts
 	@rm -rf .pytest_cache/ .coverage htmlcov/ .mypy_cache/
 
 .PHONY: clean
-clean: clean-venv clean-build clean-pyc clean-test
+clean: clean-venv clean-build clean-pyc clean-test docker-clean
