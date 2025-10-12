@@ -11,3 +11,4 @@ retrive_episodes.config
 *.old
 .venv/
 dist/
+.env
