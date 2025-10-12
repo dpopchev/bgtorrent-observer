@@ -304,13 +304,6 @@ tests-structure: ### Create test directories mirroring src modules
 		$(call log_ok,Created $$t); \
 		done
 
-.PHONY: help
-help: ### Show this help message
-	@grep -E '^(###[ ]{1,}.*|[a-zA-Z0-9_-]+:.*###)' $(MAKEFILE_LIST) \
-		| sed -E 's/^### (.*)/$(BOLD)$(BLUE)\1$(RESET)/' \
-		| sed -E 's/^([a-zA-Z0-9_-]+):.*###(.*)/    $(GREEN)\1$(RESET):\2/' \
-		| while IFS= read -r line; do printf "%b\n" "$$line"; done
-
 .PHONY: build
 build: venv $(PYPROJECT) $(LOCKFILE) | $(DIST_DIR) ### Build distribution packages
 	@$(call log_info,Building distribution package...)
@@ -318,8 +311,26 @@ build: venv $(PYPROJECT) $(LOCKFILE) | $(DIST_DIR) ### Build distribution packag
 	@$(call log_ok,Distribution packages created at $(DIST_DIR))
 
 .PHONY: publish
-publish: build ### Publish package
+publish: build ### Publish Python package
 	@$(call log_nok,Recipe not yet implemented)
+
+.PHONY: clean-venv
+clean-venv: ### Remove virtual environment and stamps
+	@rm -rf $(VENV) $(STAMPS_DIR)
+
+
+.PHONY: clean-build
+clean-build: ### Remove build artifacts
+	@rm -rf build/ $(DIST_DIR) *.egg-info
+
+.PHONY: clean-pyc
+clean-pyc: ### Remove Python cache file
+	@find $(SRC_DIR) $(TESTS_DIR) -type d -name '__pycache__' -exec rm -rf {} +
+	@find $(SRC_DIR) $(TESTS_DIR) -type d -name '*.py[co]' -delete
+
+.PHONY: clean-test
+clean-test: ### Remove test artifacts
+	@rm -rf .pytest_cache/ .coverage htmlcov/ .mypy_cache/
 
 .PHONY: demo-logging
 demo-logging: ### logging messages demo
