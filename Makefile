@@ -439,8 +439,8 @@ docker-clean: env-setup $(COMPOSE_FILE)
 
 ### Utilities-Dotenv
 
-.PHONY: env-setup ### setup an .env and example
-env-setup: $(DOTENV)
+.PHONY: env-setup
+env-setup: $(DOTENV) ### setup an .env and example
 
 $(DOTENV): $(STAMP_PYVER) | $(DOTENV_EXAMPLE)
 	@if [ ! -f $@ ]; then cp $(DOTENV_EXAMPLE) $@; fi
