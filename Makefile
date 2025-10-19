@@ -41,17 +41,22 @@ log_info = $(call log,$(BLUE),$(1))
 log_ok = $(call log,$(GREEN),$(1))
 log_nok = $(call log,$(RED),$(1))
 
+DOTENV := .env
+DOTENV_EXAMPLE := .env.example
+
+ifneq (,$(wildcard $(DOTENV)))
+	include $(DOTENV)
+	export $(shell cut -d= -f1 $(DOTENV))
+endif
+
 DEFAULT_PY := $(shell command -v python3)
 PYMANAGER := poetry
 SRC_DIR := src
 TESTS_DIR := tests
 GITIGNORE := .gitignore
 NOTEBOOKS_DIR := notebooks
-WORKDIR := workdir
-TENSORBOARDLOGS := $(WORKDIR)/tensorboard
 DIST_DIR := dist
-DOTENV := .env
-DOTENV_EXAMPLE := .env.example
+WORKDIR ?= workdir
 
 # Docker
 DOCKERFILE := Dockerfile
@@ -67,6 +72,9 @@ LOCKFILE := poetry.lock
 PYVER := .python-version
 VENV := .venv
 README := README.md
+
+# Derived paths
+TENSORBOARDLOGS := $(WORKDIR)/tensorboard
 
 # Stamps
 STAMPS_DIR := .stamps
@@ -463,6 +471,10 @@ $(DOTENV_EXAMPLE):
 	@echo "CACHE_DIR=/tmp/cache" >> $@
 	@echo "FEATURE_X_ENABLED=true" >> $@
 	@echo "MOCK_MODE=false" >> $@
+	@echo "" >> $@
+	@echo "IMAGE_NAME=$((basename $$(pwd)))" >> $@
+	@echo "IMAGE_TAG=latest" >> $@
+	@echo "DOCKER_COMPOSE=podman-compose" >> $@
 	@echo "# Add more environment variables as needed" >> $@
 
 ### Utilities
