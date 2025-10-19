@@ -52,6 +52,7 @@ WORKDIR ?= workdir
 
 # Docker
 DOCKERFILE ?= Dockerfile
+REGISTRY ?= localhost:5000
 IMAGE_NAME ?= $(notdir $(CURDIR))
 IMAGE_TAG ?= latest
 COMPOSE_FILE ?= docker-compose.yml
@@ -369,7 +370,7 @@ $(COMPOSE_FILE): | $(DOCKERFILE)
 	@echo '      dockerfile: $(DOCKERFILE)' >> $@
 	@echo '      args:' >> $@
 	@echo '        PYTHON_VERSION: $${PYTHON_VERSION}' >> $@
-	@echo '    image: $(IMAGE_NAME):$(IMAGE_TAG)' >> $@
+	@echo '    image: $${REGISTRY}/$${IMAGE_NAME}:$${IMAGE_TAG}' >> $@
 	@echo '    env_file:' >> $@
 	@echo '      - .env' >> $@
 	@echo '    environment:' >> $@
@@ -432,6 +433,11 @@ docker-logs: ### Tail logs
 docker-logs: env-setup $(COMPOSE_FILE)
 	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) logs -f
 
+.PHONY: docker-publish
+docker-publish: ###
+docker-publish: env-setup docker-build
+	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) push
+
 .PHONY: docker-clean
 docker-clean: ### Remove images built by Compose
 docker-clean: env-setup $(COMPOSE_FILE)
@@ -470,6 +476,7 @@ $(DOTENV_EXAMPLE):
 	@echo "CACHE_DIR=/tmp/cache" >> $@
 	@echo "FEATURE_X_ENABLED=true" >> $@
 	@echo "MOCK_MODE=false" >> $@
+	@echo "REGISTRY=localhost:5000" >> $@
 	@echo "IMAGE_NAME=$$(basename $$(pwd))" >> $@
 	@echo "IMAGE_TAG=latest" >> $@
 	@echo "DOCKER_COMPOSE=docker compose" >> $@
