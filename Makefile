@@ -325,8 +325,8 @@ build: venv $(PYPROJECT) $(LOCKFILE) | $(DIST_DIR) ### Build distribution packag
 	$(PYMANAGER) build
 	@$(call log_ok,Distribution packages created at $(DIST_DIR))
 
-.PHONY: publish
-publish: build ### Publish Python package
+.PHONY: push
+push: build ### Push Python package to registry
 	@$(call log_nok,Recipe not yet implemented)
 
 .PHONY: clean-venv
@@ -437,9 +437,9 @@ docker-logs: ### Tail logs
 docker-logs: env-setup $(COMPOSE_FILE)
 	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) logs -f
 
-.PHONY: docker-publish
-docker-publish: ###
-docker-publish: env-setup docker-build
+.PHONY: docker-push
+docker-push: ### Push to registry
+docker-push: env-setup $(COMPOSE_FILE)
 	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) push
 
 .PHONY: docker-clean
