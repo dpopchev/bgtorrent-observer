@@ -427,6 +427,11 @@ docker-down: ### Stop and remove containers
 docker-down: env-setup $(COMPOSE_FILE)
 	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) down
 
+.PHONY: docker-reup
+docker-reup: ### Rebuild and Start services(s) via Compose
+docker-reup: env-setup $(COMPOSE_FILE) docker-build
+	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) up -d
+
 .PHONY: docker-logs
 docker-logs: ### Tail logs
 docker-logs: env-setup $(COMPOSE_FILE)
