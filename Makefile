@@ -490,7 +490,7 @@ $(DOTENV_EXAMPLE):
 
 .PHONY: help
 help: ### Show this help message
-	@grep -E '^(###[ ]{1,}.*|[a-zA-Z0-9_-]+:.*###)' $(MAKEFILE_LIST) \
+	@grep -E '^(###[ ]{1,}.*|[a-zA-Z0-9_-]+:.*###)' Makefile \
 		| sed -E 's/^### (.*)/$(BOLD)$(BLUE)\1$(RESET)/' \
 		| sed -E 's/^([a-zA-Z0-9_-]+):.*###(.*)/    $(GREEN)\1$(RESET):\2/' \
 		| while IFS= read -r line; do printf "%b\n" "$$line"; done

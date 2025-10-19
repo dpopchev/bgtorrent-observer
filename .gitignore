@@ -13,3 +13,5 @@ retrive_episodes.config
 dist/
 .env
 .env.mk
+.stamps/
+.env.*
