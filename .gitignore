@@ -12,3 +12,4 @@ retrive_episodes.config
 .venv/
 dist/
 .env
+.env.mk
