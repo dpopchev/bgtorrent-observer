@@ -450,13 +450,13 @@ $(DOTENV).mk: $(DOTENV)
 	@sed '/^#/d;/^$$/d;s/^/export /' $< > $@
 	@$(call add_line,$@,$(GITIGNORE))
 
-
 .PHONY: env-setup
 env-setup: $(DOTENV) ### setup an .env and example
+	@$(call add_line,$<,$(GITIGNORE))
+	@$(call add_line,$<.*,$(GITIGNORE))
 
-$(DOTENV): | $(STAMP_PYVER) $(DOTENV_EXAMPLE)
+$(DOTENV): $(STAMP_PYVER) | $(DOTENV_EXAMPLE)
 	@if [ ! -f $@ ]; then cp $(DOTENV_EXAMPLE) $@; fi
-	@$(call add_line,$@,$(GITIGNORE)))
 	@_PYVER=$$(cat $(PYVER)); \
 	       sed -i.bak "s/^PYTHON_VERSION=.*/PYTHON_VERSION=$$_PYVER/" $@ && rm -f $@.bak
 
