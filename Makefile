@@ -357,7 +357,6 @@ podman-build: ### Use to bypass the podman-compose if needed
 docker-build: ### Build Docker image via Compose
 docker-build: build env-setup $(COMPOSE_FILE)
 	@$(call log_info,Building Docker image $(IMAGE_NAME):$(IMAGE_TAG)...)
-	@PYVER_VAL=$$(cat $(PYVER)); \
 	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) build
 	@$(call log_ok,Docker image saved at $@)
 
