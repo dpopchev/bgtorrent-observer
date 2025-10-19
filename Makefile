@@ -444,6 +444,7 @@ env-setup: $(DOTENV) ### setup an .env and example
 
 $(DOTENV): $(STAMP_PYVER) | $(DOTENV_EXAMPLE)
 	@if [ ! -f $@ ]; then cp $(DOTENV_EXAMPLE) $@; fi
+	@$(call add_line,$@,$(GITIGNORE)))
 	@_PYVER=$$(cat $(PYVER)); \
 	       sed -i.bak "s/^PYTHON_VERSION=.*/PYTHON_VERSION=$$_PYVER/" $@ && rm -f $@.bak
 
